@@ -1,7 +1,3 @@
----
-title: "Assignment 1: RMarkdown Homework"
-author: "Enes Kacar"
-date: "8/4/2020"
-output: html_document
----
-
+theme: jekyll-theme-cayman
+title: Enes Kacar Progress Journal
+description: IE48A 19/20 Summer - BOUN
