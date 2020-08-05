@@ -1,2 +1,15 @@
-title: Enes Kacar Progress Journal
-description: IE48A 19/20 Summer - BOUN
+---
+title: "Assignment 1: RMarkdown Homework"
+author: "Enes Kacar"
+date: "8/4/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+I am an Industrial Engineering student at the Bogazici University.I also do a long term internship at Pfizer.My responsibilities are to make sales analysis and reporting.I'am pursuing a data scientist career.My linkedin profile can be reached via this [link](linkedin.com/in/enes-kacar-aa546812b).
+
