@@ -1,0 +1,167 @@
+---
+title: "Assignment 2:Electricity Market Prices"
+author: "Enes Kacar"
+date: "JULY 2020"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readxl)
+library(tidyr)
+library(tinytex)
+library(lubridate)
+library(ggplot2)
+library(dplyr)
+```
+# Dataset
+
+###  Terminology
+
+PTF = Market Clearing Price
+
+SMF = System Marginal Price
+
+PDF = Positive Unbalance Price
+
+NDF = Negative Unbalance Price
+
+For more detailed information, you can visit the [EPİAŞ](https://www.epias.com.tr/spot-elektrik-piyasasi) website.
+
+### Reading Data
+```{r}
+ptfsmf <- read_excel('ptf-smf.xls')
+```
+```{r}
+glimpse(ptfsmf)
+```
+### Editting Data
+```{r}
+# Arrangement of the names of the positive and negative imbalance columns
+colnames(ptfsmf)[4] = "PDF"
+colnames(ptfsmf)[5] = "NDF"
+
+# Converting the date and time to POSIX format
+ptfsmf <- ptfsmf %>% mutate(Tarih_Yeni = 
+                              as.POSIXct(ptfsmf$Tarih,format="%d.%m.%y %H:%M", "GMT")) %>%
+                     select(Tarih_Yeni, PTF, SMF, PDF, NDF) %>%
+                     rename(Tarih = Tarih_Yeni)
+
+# Converting the remaining columns to numeric class
+ptfsmf[,c(2:5)] <- lapply(ptfsmf[,c(2:5)],
+                          function(x) as.numeric(gsub(",", ".", gsub("\\.", "", x))))
+```
+# 1.Weekly Analysis
+
+### Data preparition for weekly analysis
+```{r}
+weekly_analysis <- ptfsmf %>%
+  select(Tarih,PTF,SMF,PDF,NDF) %>%
+  mutate(Week=as.factor(week(Tarih)))%>%
+  pivot_longer(cols = c(PTF,SMF,PDF,NDF),names_to = 'names',values_to='values')%>%
+  group_by(Week,names)%>%
+  summarise(sum_price=sum(values),mean_price=mean(values),max_price = max(values),min_price=min(values),.groups = 'drop')%>%
+  transform(Week=as.numeric(Week))
+glimpse(weekly_analysis)
+```
+
+### Visualiation
+
+```{r}
+ggplot(weekly_analysis,aes(x=Week, y = mean_price, fill = names)) +
+  geom_col(position="dodge2")+
+  labs(y=" Weekly Average of Prices")+
+  theme_minimal()
+  
+```
+```{r}
+ggplot(weekly_analysis,aes(x=Week, y = max_price, fill = names)) +
+  geom_col(position='dodge2')+
+  labs(y=" Weekly Max Prices")+
+  theme_minimal()
+```
+
+
+```{r}
+ggplot(weekly_analysis,aes(x=Week, y = min_price, fill = names)) +
+  geom_col(position="dodge2")+
+  labs(y=" Weekly Minimum Prices")+
+  theme_minimal()
+```
+
+
+
+# 2. Daily Analysis
+
+### Data preparition for hourly analysis
+
+```{r}
+daily_analysis <- ptfsmf %>%
+  select(Tarih,PTF,SMF,PDF,NDF) %>%
+  mutate(Day=as.factor(day(Tarih)))%>%
+  pivot_longer(cols = c(PTF,SMF,PDF,NDF),names_to = 'names',values_to='values')%>%
+  group_by(Day,names)%>%
+  summarise(sum_price=sum(values),mean_price=mean(values),max_price = max(values),min_price=min(values),.groups = 'drop')%>%
+  transform(Day=as.numeric(Day))
+glimpse(daily_analysis)
+```
+
+```{r}
+ggplot(daily_analysis, aes( Day,mean_price)) + 
+  geom_point()+
+  geom_smooth() +
+    labs(
+        x = "Days of July", # making the axis label blank will remove it
+        y = "Price(mean)")
+```
+
+
+# 3.Hourly Analysis
+
+### Data preparition for hourly analysis
+```{r}
+hourly_analysis <- ptfsmf %>%
+  select(Tarih,PTF,SMF,PDF,NDF) %>%
+  mutate(Hour=as.factor(hour(Tarih)))%>%
+  pivot_longer(cols = c(PTF,SMF,PDF,NDF),names_to = 'names',values_to='values')%>%
+  group_by(Hour,names)%>%
+  summarise(sum_price=sum(values),mean_price=mean(values),max_price = max(values),min_price=min(values),.groups = 'drop')%>%
+  transform(Hour=as.numeric(Hour))
+glimpse(hourly_analysis)
+```
+### Visualization
+```{r}
+ggplot(hourly_analysis, aes(x = Hour, y = mean_price)) +
+    geom_point() + 
+    geom_smooth() +
+    labs(title = "Hourly Analysis",
+        x = "Days of June", 
+        y = "Price(mean)")
+```
+
+
+
+#  PTF vs SMF
+
+```{r}
+ggplot(ptfsmf,aes(x=PTF,y=SMF)) + 
+  geom_point()+ 
+  geom_smooth() +
+  labs(
+        x = "PTF",
+        y = "SMF")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
