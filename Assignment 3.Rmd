@@ -1,0 +1,261 @@
+---
+title: "Assignment 3 - Diamonds Price Estimation"
+author: "Enes Kacar"
+date: "9/13/2020"
+output: 
+  html_document:
+    toc: true # table of content true
+    toc_depth: 3  # upto two depths of headings (specified by #, ## and ###)
+    number_sections: true  ## if you want number sections at each table header
+    theme: united  # many options for theme, this one is my favorite.
+    highlight: tango  # specifies the syntax highlighting style
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+The goal is to use machine learning techniques to obtain the predicted diamond price with the minimum errors from the actual price, which involved a complete process of exploratory data analysis, feature engineering, feature selection and predictive modeling analysis.
+
+We assume that the actual price in the historical diamond dataset reflects the current value without other factors such as inflation.
+
+
+```{r libraries, include=FALSE,warning=FALSE,message=FALSE}
+library(dplyr)
+library(ggplot2)
+library(lubridate)
+library(tidyverse)
+library(tidyr)
+library(kableExtra)
+library(corrplot)
+library(grid)
+library(lattice)
+library(ggpubr)
+library(scales)
+library(wesanderson)
+library(RColorBrewer)
+library(Metrics)
+library(rpart) 
+library(rpart.plot) 
+library(rattle)
+library(xkcd)
+library(GGally)
+library(scales)
+library(memisc)
+library(magrittr)
+library(caret)
+```
+
+```{r,warning=FALSE,message=FALSE}
+set.seed(503)
+library(tidyverse)
+diamonds_test <- diamonds %>% mutate(diamond_id = row_number()) %>% 
+    group_by(cut, color, clarity) %>% sample_frac(0.2) %>% ungroup()
+
+diamonds_train <- anti_join(diamonds %>% mutate(diamond_id = row_number()), 
+    diamonds_test, by = "diamond_id")
+```
+
+```{r Diamonds,warning=FALSE,message=FALSE}
+set.seed(503)
+diamonds_test <- diamonds %>% mutate(diamond_id = row_number()) %>% 
+    group_by(cut, color, clarity) %>% sample_frac(0.2) %>% ungroup()
+diamonds_train <- anti_join(diamonds %>% mutate(diamond_id = row_number()), 
+    diamonds_test, by = "diamond_id")
+diamonds_all <- bind_rows(diamonds_train,diamonds_test)
+```
+
+
+Below is a sample from  dataset.
+
+```{r,warning=FALSE,message=FALSE}
+  head(diamonds_train)%>%
+  kbl(caption = "Sample from Dataset") %>%
+  kable_minimal(full_width = F)
+  
+  
+```
+
+
+
+Below is statistical information about our data.
+
+
+```{r,warning=FALSE,message=FALSE}
+summary(diamonds)
+```
+```{r,warning=FALSE,message=FALSE}
+set.seed(20022012)
+diamond_samp <- diamonds_train[sample(1:length(diamonds_train$price), 10000), ]
+ggpairs(diamond_samp, outlier.shape = I('.')) # params = c(shape = I('.'),
+```
+
+
+# Exploring the data
+
+Correlation of variable with Price
+If we examine the correlation of variables with price. We can see that there is strong positive correlation with x,y,z and carat. Correlation with table and depth variable is low.
+
+```{r,warning=FALSE,message=FALSE}
+with(diamonds_train,
+     data.frame(cor_x_price = cor(x, price),
+                cor_y_price = cor(y, price),
+                cor_z_price = cor(z, price),
+                cor_depth_price = cor(depth, price),
+                cor_table_price2 = cor(table, price),
+                cor_carat_price3 = cor(carat, price)
+     )
+)
+```
+
+Since we have a few factor variables, I will use one hot encoding to convert them to numeric type.
+
+```{r,warning=FALSE,message=FALSE}
+#*** one hot Encoding
+
+ohe_features<-c("cut","color","clarity")
+dummies<-dummyVars(~cut + color + clarity ,data=diamonds_train)
+
+data02_ohe<-as.data.frame(predict(dummies,newdata=diamonds_train))
+data03_combined<-cbind(diamonds_train,data02_ohe)
+
+data04<-data03_combined[,!names(data03_combined)%in%ohe_features]
+
+rm(data03_combined)
+rm(data02_ohe)
+```
+
+
+
+```{r,warning=FALSE,message=FALSE}
+## Correlation plot
+y.label <-as.numeric(data04$price)
+corrplot(cor(cbind(data04,Price=y.label)),type="upper")
+```
+
+As the carat of diamond increases price also increase as stated in correlation also. Price range is very big even at the same carat. This shows us that there are other variables that effect the price also.
+
+```{r,warning=FALSE,message=FALSE}
+ggplot(diamonds_train) + 
+  geom_point(aes(x = carat, y = price), alpha = .05, color = "blue") + 
+  labs(title = "Diamond Price vs. Length", x = "Length of diamond (mm)", y = "Price of diamond (USD)")
+```
+
+
+Let’s add the clarity information to plot.
+
+
+```{r,warning=FALSE,message=FALSE}
+ggplot(aes(x = carat, y = price), data = diamonds_train) + 
+  geom_point(alpha = 0.5, size = 1, position = 'jitter',aes(color=clarity)) +
+  scale_color_brewer(type = 'div',
+                     guide = guide_legend(title = 'Clarity', reverse = T,
+                                          override.aes = list(alpha = 1, size = 2))) +                         
+  ggtitle('Price by Carat and Clarity')
+```
+```{r,warning=FALSE,message=FALSE}
+qplot(price, data=diamonds_train ,geom="density", fill=cut, alpha=I(.5), 
+      main="Distribution of Carat", xlab="Different kinds of cut", 
+      ylab="Density") + theme_minimal()
+
+qplot(price, data=diamonds_train, geom="density", fill=color, alpha=I(.5), 
+      main="Distribution of Carat", xlab="Different Colors", 
+      ylab="Density") + theme_minimal()
+
+qplot(price, data=diamonds_train, geom="density", fill=clarity, alpha=I(.5), 
+      main="Distribution of Carat", xlab="Different clarity parameters", 
+      ylab="Density") + theme_minimal()
+```
+
+# CART modelling
+First we prepare the dataset we use to train the model then test the model.
+
+```{r}
+diamond_model <- rpart(price ~ x+y+z+carat+cut+color+clarity, data=diamonds_train)
+
+summary(diamond_model)
+```
+
+
+```{r}
+fancyRpartPlot(diamond_model)
+```
+
+With decision tree we can test our model with test data.
+
+```{r}
+pred_Diamond_test <- predict(diamond_model, newdata = diamonds_test)
+head(pred_Diamond_test,10)
+```
+
+
+Before we prune the tree, display CP table look for the lowest cross-validation error(xerror). Lowest xerror is 0.12015 at CP value of 0.01
+
+```{r}
+printcp(diamond_model)
+```
+
+
+```{r}
+#Get the lowest CP value from CP table
+min.xerror <- diamond_model$cptable[which.min(diamond_model$cptable[,"xerror"]),"CP"]
+
+min.xerror
+```
+
+Next, we prune the tree based on this value of CP:
+
+```{r}
+# Prune the tree
+diamond_model.pruned <- prune(diamond_model, cp = min.xerror) 
+
+# Draw the prune tree
+fancyRpartPlot(diamond_model.pruned)
+```
+
+
+Then use this prune tree to evaluate the our test data
+
+
+```{r}
+pred_Diamond_test.pruned <- predict(diamond_model.pruned, newdata = diamonds_test)
+```
+
+
+Obtain the pseudo R2 - a correlation.
+
+
+```{r}
+fitcorr <- format(cor(diamonds_test$price, pred_Diamond_test.pruned)^2, digits=4)
+
+fitcorr
+```
+Result
+
+```{r}
+# Create a data frame with the predictions for each method
+all.predictions <- data.frame(actual = diamonds_test$price,
+                              full.tree = pred_Diamond_test,
+                              pruned.tree = pred_Diamond_test.pruned)
+
+#For each actual create model and predictions row
+all.predictions <- gather(all.predictions, key = model, value = predictions, 2:3)
+
+# Plot "Predicted vs. actual, by model""
+ggplot(data = all.predictions, aes(x = actual, y = predictions)) + 
+  geom_point(colour = "blue") + 
+  geom_abline(intercept = 0, slope = 1, colour = "red") +
+  facet_wrap(~ model, ncol = 2) + 
+  ggtitle("Predicted vs. Actual, by model") 
+```
+
+### References
+
+* https://rmarkdown.rstudio.com
+* http://people.stat.sfu.ca/~raltman/stat402/402L26.pdf
+* https://ggplot2.tidyverse.org
+* https://statisticsbyjim.com
+* https://codeburst.io/2-important-statistics-terms-you-need-to-know-in-data-science-skewness-and-kurtosis-388fef94eeaa
+* https://r4ds.had.co.nz
