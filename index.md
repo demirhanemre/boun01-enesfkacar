@@ -1,3 +1,5 @@
+## Assignments
+
 [Assignment 1](Untitled.html)
 
 
@@ -5,3 +7,7 @@
 
 
 [Assignment 3](Assignment-3.html)
+
+
+## Progress Journal of Our Project Group
+[Group Dol-R's Progress Journal](https://pjournal.github.io/boun01g-dol-r/)
